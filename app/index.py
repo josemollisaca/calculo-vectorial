@@ -1,15 +1,14 @@
-# Exportar la aplicación Flask como 'application' para Vercel
-application = app.server
-
-import dash
-from dash import dcc, html, Input, Output, State, callback_context
+from dash import Dash, dcc, html, Input, Output, State, callback_context
 import plotly.graph_objs as go
 import numpy as np
 from flask import Flask
 
 # Inicializar Flask y Dash
-servidor = Flask(__name__)
-app = dash.Dash(__name__, server=servidor, suppress_callback_exceptions=True)
+server = Flask(__name__)
+app = Dash(__name__, server=server, suppress_callback_exceptions=True)
+
+# Configuración para Vercel (CRUCIAL)
+application = server
 
 # Parámetros iniciales
 parametros_iniciales = {
@@ -31,45 +30,38 @@ simulacion_inicial = {
 
 # Funciones matemáticas
 def folio_parametrico(t, a=1.0):
-    """Calcula las coordenadas x, y del folio de Descartes para un parámetro t."""
     denominador = 1 + t**3
     x = (3 * a * t) / denominador
     y = (3 * a * t**2) / denominador
     return x, y
 
 def calcular_curvatura(t, a=1.0):
-    """Calcula la curvatura κ en el punto t del folio de Descartes."""
     if t < 0.001:
         return 0
     denominador = 1 + t**3
     denominador2 = denominador**2
     
-    # Derivadas primera y segunda
     dx_dt = (3 * a * (1 - 2 * t**3)) / denominador2
     dy_dt = (3 * a * t * (2 - t**3)) / denominador2
     d2x_dt2 = (18 * a * t * (t**3 - 2)) / (denominador2 * denominador)
     d2y_dt2 = (6 * a * (1 - 4 * t**3 + t**6)) / (denominador2 * denominador)
     
-    # Curvatura κ = |x'y'' - y'x''| / (x'² + y'²)^(3/2)
     numerador = abs(dx_dt * d2y_dt2 - dy_dt * d2x_dt2)
     denominador = (dx_dt**2 + dy_dt**2)**1.5
     return numerador / denominador if denominador > 0.001 else 0
 
 def calcular_velocidad_adaptativa(curvatura, vel_max, limite_curvatura, control_adaptativo):
-    """Calcula la velocidad adaptativa basada en la curvatura."""
     if not control_adaptativo:
         return vel_max
     factor_velocidad = min(1.0, limite_curvatura / (curvatura + 0.1))
     return vel_max * max(0.1, factor_velocidad)
 
 def identificar_problemas(t, curvatura, velocidad, a):
-    """Identifica problemas en la trayectoria basados en curvatura y velocidad."""
     problemas = []
     x, y = folio_parametrico(t, a)
     posicion = {'x': x, 'y': y}
     distancia_desde_origen = np.sqrt(x**2 + y**2)
     
-    # Problema 1: Curvatura alta
     if curvatura > 5.0:
         problemas.append({
             'tipo': 'curvatura_alta',
@@ -79,7 +71,6 @@ def identificar_problemas(t, curvatura, velocidad, a):
             'recomendacion': 'Reducir velocidad significativamente'
         })
     
-    # Problema 2: Proximidad a singularidad
     if distancia_desde_origen < 0.1:
         problemas.append({
             'tipo': 'singularidad',
@@ -89,7 +80,6 @@ def identificar_problemas(t, curvatura, velocidad, a):
             'recomendacion': 'Implementar bypass o parada controlada'
         })
     
-    # Problema 3: Giro brusco
     if 0.5 < t < 2.0 and curvatura > 2.0:
         problemas.append({
             'tipo': 'giro_brusco',
@@ -99,7 +89,6 @@ def identificar_problemas(t, curvatura, velocidad, a):
             'recomendacion': 'Aplicar suavizado de trayectoria'
         })
     
-    # Problema 4: Problema velocidad-curvatura
     if velocidad * curvatura > 3.0:
         problemas.append({
             'tipo': 'velocidad_curvatura',
@@ -112,7 +101,6 @@ def identificar_problemas(t, curvatura, velocidad, a):
     return problemas
 
 def generar_soluciones(problemas):
-    """Genera soluciones basadas en los problemas identificados."""
     soluciones = []
     for problema in problemas:
         if problema['tipo'] == 'curvatura_alta':
@@ -144,7 +132,6 @@ def generar_soluciones(problemas):
                 'efectividad': 85
             })
     
-    # Solución general
     soluciones.append({
         'titulo': 'Filtro de Trade-off Velocidad-Precisión',
         'descripcion': 'Balance dinámico entre rapidez y precisión',
@@ -153,9 +140,7 @@ def generar_soluciones(problemas):
     })
     return soluciones
 
-# Generar datos de análisis
 def generar_datos_analisis(params):
-    """Genera datos para los gráficos y listas de problemas/soluciones."""
     t_valores = np.linspace(0.1, 5.0, 101)
     datos_analisis = []
     datos_trayectoria = []
@@ -167,7 +152,6 @@ def generar_datos_analisis(params):
         velocidad_base = calcular_velocidad_adaptativa(
             curvatura, params['velocidad_maxima'], params['limite_curvatura'], params['control_adaptativo']
         )
-        # Aplicar suavizado
         velocidad_suavizada = velocidad_base * (1 - params['factor_suavizado']) + \
                               params['velocidad_maxima'] * params['factor_suavizado']
         problemas = identificar_problemas(t, curvatura, velocidad_suavizada, params['a'])
@@ -199,7 +183,6 @@ app.layout = html.Div(className='max-w-7xl mx-auto p-6 bg-gray-50 min-h-screen',
         html.H1('Análisis de Trayectoria Robótica - Folio de Descartes', className='text-3xl font-bold text-gray-800 mb-2'),
         html.P('Identificación automática de problemas y generación de soluciones para robots siguiendo el folio de Descartes', className='text-gray-600 mb-4'),
         
-        # Panel de control
         html.Div(className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6', children=[
             html.Div(className='bg-blue-50 p-4 rounded-lg', children=[
                 html.Label('Parámetro a', className='block text-sm font-medium text-gray-700 mb-2'),
@@ -227,7 +210,6 @@ app.layout = html.Div(className='max-w-7xl mx-auto p-6 bg-gray-50 min-h-screen',
             ])
         ]),
         
-        # Controles de simulación
         html.Div(className='flex items-center gap-4 mb-6', children=[
             html.Button(id='boton-sim', n_clicks=0, children=[
                 html.Span('Iniciar Simulación', id='boton-sim-texto'),
@@ -244,7 +226,6 @@ app.layout = html.Div(className='max-w-7xl mx-auto p-6 bg-gray-50 min-h-screen',
         ])
     ]),
     
-    # Gráficos principales
     html.Div(className='grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6', children=[
         html.Div(className='bg-white rounded-lg shadow-lg p-6', children=[
             html.H3('Trayectoria del Robot', className='text-lg font-semibold mb-4'),
@@ -274,7 +255,6 @@ app.layout = html.Div(className='max-w-7xl mx-auto p-6 bg-gray-50 min-h-screen',
         ])
     ]),
     
-    # Problemas y soluciones
     html.Div(className='grid grid-cols-1 lg:grid-cols-2 gap-6', children=[
         html.Div(className='bg-white rounded-lg shadow-lg p-6', children=[
             html.H3(id='titulo-problemas', className='text-lg font-semibold mb-4 flex items-center', children=[
@@ -292,7 +272,6 @@ app.layout = html.Div(className='max-w-7xl mx-auto p-6 bg-gray-50 min-h-screen',
         ])
     ]),
     
-    # Resumen estadístico
     html.Div(className='bg-white rounded-lg shadow-lg p-6 mt-6', children=[
         html.H3('Resumen del Análisis', className='text-lg font-semibold mb-4'),
         html.Div(id='resumen-estadisticas', className='grid grid-cols-2 md:grid-cols-4 gap-4')
@@ -319,7 +298,6 @@ app.layout = html.Div(className='max-w-7xl mx-auto p-6 bg-gray-50 min-h-screen',
     ]
 )
 def actualizar_valores_sliders(a, velocidad_maxima, limite_curvatura, factor_suavizado):
-    """Actualiza los valores mostrados de los sliders."""
     return (
         f'{a:.1f}',
         f'{velocidad_maxima:.1f} m/s',
@@ -348,7 +326,6 @@ def actualizar_valores_sliders(a, velocidad_maxima, limite_curvatura, factor_sua
     ]
 )
 def actualizar_analisis(a, velocidad_maxima, limite_curvatura, factor_suavizado, control_adaptativo, estado_sim):
-    """Actualiza los gráficos, problemas, soluciones y resumen estadístico."""
     params = {
         'a': a,
         'velocidad_maxima': velocidad_maxima,
@@ -359,7 +336,6 @@ def actualizar_analisis(a, velocidad_maxima, limite_curvatura, factor_suavizado,
     
     datos_analisis, datos_trayectoria, problemas, soluciones = generar_datos_analisis(params)
     
-    # Gráfico de trayectoria
     figura_trayectoria = go.Figure()
     colores = ['#ef4444' if punto['problemas'] else '#3b82f6' for punto in datos_trayectoria]
     figura_trayectoria.add_trace(go.Scatter(
@@ -392,7 +368,6 @@ def actualizar_analisis(a, velocidad_maxima, limite_curvatura, factor_suavizado,
         margin=dict(l=40, r=40, t=40, b=40)
     )
     
-    # Gráfico de curvatura y velocidad
     figura_curvatura_velocidad = go.Figure()
     figura_curvatura_velocidad.add_trace(go.Scatter(
         x=[d['t'] for d in datos_analisis],
@@ -415,7 +390,6 @@ def actualizar_analisis(a, velocidad_maxima, limite_curvatura, factor_suavizado,
         margin=dict(l=40, r=40, t=40, b=40)
     )
     
-    # Lista de problemas
     titulo_problemas = [html.Span('⚠', className='mr-2 text-red-500'), f'Problemas Identificados ({len(problemas)})']
     lista_problemas = [
         html.Div(className=f"p-3 border-l-4 {'border-red-500 bg-red-50' if p['severidad'] == 'crítico' else 'border-yellow-500 bg-yellow-50'} mb-2", children=[
@@ -428,7 +402,6 @@ def actualizar_analisis(a, velocidad_maxima, limite_curvatura, factor_suavizado,
         ]) for p in problemas[:10]
     ] if problemas else [html.P('No se detectaron problemas críticos', className='text-gray-500 text-sm')]
     
-    # Lista de soluciones
     titulo_soluciones = [html.Span('✔', className='mr-2 text-green-500'), f'Soluciones Implementables ({len(soluciones)})']
     lista_soluciones = [
         html.Div(className='p-3 border border-green-200 bg-green-50 rounded mb-2', children=[
@@ -444,7 +417,6 @@ def actualizar_analisis(a, velocidad_maxima, limite_curvatura, factor_suavizado,
         ]) for s in soluciones
     ]
     
-    # Resumen estadístico
     conteo_criticos = sum(1 for p in problemas if p['severidad'] == 'crítico')
     conteo_advertencias = sum(1 for p in problemas if p['severidad'] == 'advertencia')
     efectividad_promedio = round(sum(s['efectividad'] for s in soluciones) / len(soluciones)) if soluciones else 0
@@ -497,7 +469,6 @@ def actualizar_analisis(a, velocidad_maxima, limite_curvatura, factor_suavizado,
     ]
 )
 def controlar_simulacion(sim_clicks, reiniciar_clicks, n_intervalos, params, estado_sim):
-    """Controla el inicio, pausa y reinicio de la simulación."""
     ctx = callback_context
     id_activado = ctx.triggered[0]['prop_id'].split('.')[0]
     
@@ -534,7 +505,7 @@ def controlar_simulacion(sim_clicks, reiniciar_clicks, n_intervalos, params, est
         t = 0.1 + nuevo_tiempo
         x, y = folio_parametrico(t, params['a'])
         nueva_trayectoria = estado_sim['trayectoria'] + [{'x': x, 'y': y}]
-        nueva_trayectoria = nueva_trayectoria[-50:]  # Mantener últimos 50 puntos
+        nueva_trayectoria = nueva_trayectoria[-50:]
         
         return (
             'flex items-center px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium',
